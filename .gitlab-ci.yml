@@ -1,0 +1,465 @@
+# hanlin CI/CD pipeline
+# 1. build(maven/gradle)
+# 2. test:check(sonarqube)，代码扫描
+# 3. test:unit-test(maven / gradle)，程序单元测试
+# 4. image, 成功后将镜像push到私有repostory中
+# 5. deploy，将image部署到k8s对应环境中
+# 6. auto-test(postman / jMeter ...), 自动化测试脚本
+
+## 使用须知
+## 需要在GitLab对应项目中设置BUILD_ENV BUILD_PATH参数,
+## GitLab 设置位置project->settings->ci/cd->environment variables
+## BUILD_ENV 编译工具：maven gradle
+## BUILD_PATH 编译目录：
+##   maven: target/*.jar
+##   gradle: build/libs/*.jar
+##   node: dist
+## JUNIT_REPORTS junit测试报告路径
+##   maven: target/*-reports/TEST-*.xml
+##   gradle: build/test-results/test/TEST-*.xml
+## DOCKER_PRI_REGISTRY docker私有仓库域名
+## REGISTRY_USER docker私有仓库登录用户名
+## REGISTRY_PWD docker私有仓库登录密码
+
+
+image: docker:stable
+
+variables:
+  MAVEN_OPTS: " -Xms1g -Xmx1g -Dhttps.protocols=TLSv1.2 -Dmaven.repo.local=/root/.m2/repository -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=WARN -Dorg.slf4j.simpleLogger.showDateTime=true -Djava.awt.headless=true"
+  MAVEN_CLI_OPTS: "--batch-mode --errors --fail-at-end --show-version -DinstallAtEnd=true -DdeployAtEnd=true"
+  DOCKER_DRIVER: overlay2
+  DOCKER_HOST: tcp://localhost:2375
+  # 关闭dind TLS
+  DOCKER_TLS_CERTDIR: ""
+  # 镜像命名: 项目命名空间/项目名称/分支名称:提交SHA前8位
+  IMAGE_NAME: $DOCKER_PRI_REGISTRY/$CI_PROJECT_PATH/$CI_COMMIT_REF_SLUG:$CI_COMMIT_SHORT_SHA
+
+
+### !!!使用注意!!!
+### 这里暂时无法使用$DOCKER_PRI_REGISTRY传递私有docker仓库域名，需要手工修改下
+services:
+  - name: docker:dind
+    command: ["--insecure-registry=maven.sino-hanlin.tech:30005"]
+
+stages:
+  # 由于maven或者gradle中test任务依赖于build，且gitlab-docker-ruuner为每个任务单独建立一个docker环境。为了避免不必要的任务资源传递，直接使用test任务合并build和test
+  # - build
+  - test
+  - image
+  - deploy
+#  - auto-test
+
+#k8s部署脚本模板
+.k8s-deploy-template: &k8s_deploy_definition
+  image: lachlanevenson/k8s-kubectl:latest
+  script: |
+    if [ "${BUILD_ENV}" != "node" ]; then export port=8080; else export port=80; fi
+
+    cat >> deployment.yaml <<EOF
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: $CI_ENVIRONMENT_SLUG
+      namespace: gitlab-managed-apps
+      annotations:
+        app.gitlab.com/env: $CI_ENVIRONMENT_SLUG
+        app.gitlab.com/app: $CI_PROJECT_PATH_SLUG
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          name: $CI_ENVIRONMENT_SLUG
+      template:
+        metadata:
+          labels:
+            name: $CI_ENVIRONMENT_SLUG
+    EOF
+
+    if [ "${BUILD_ENV}" != "node" ]; then
+    cat >> deployment.yaml <<EOF
+          annotations:
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "${port}"
+            prometheus.io/path: "/actuator/prometheus"
+    EOF
+    fi
+
+    if [[ $(echo "${CI_ENVIRONMENT_SLUG%%-*}") == "st" ]]; then
+    cat >> deployment.yaml << EOF
+        spec:
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: hanlin.arch/enviroment
+                    operator: Exists
+                - matchExpressions:
+                  - key: hanlin.arch/enviroment-scope.st
+                    operator: Exists
+    EOF
+    else
+    cat >> deployment.yaml << EOF
+        spec:
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: hanlin.arch/enviroment
+                    operator: Exists
+                - matchExpressions:
+                  - key: hanlin.arch/enviroment-scope.test
+                    operator: Exists
+                  - key: hanlin.arch/enviroment-scope.review
+                    operator: Exists
+    EOF
+    fi
+
+    cat >> deployment.yaml <<EOF
+          volumes:
+            - name: time-config
+              hostPath:
+                path: /etc/localtime
+            - name: tz-config
+              hostPath:
+                path: /etc/timezone
+          containers:
+            - name: $CI_ENVIRONMENT_SLUG
+              image: $IMAGE_NAME
+              volumeMounts:
+                - mountPath: /etc/localtime
+                  name: time-config
+                  readOnly: true
+                - mountPath: /etc/timezone
+                  name: tz-config
+                  readOnly: true
+    EOF
+
+    if [[ $(echo "${CI_ENVIRONMENT_SLUG%%-*}") == "st" ]]; then
+    cat >> deployment.yaml << EOF
+              resources:
+                limits:
+                  memory: "4Gi"
+                  cpu: "2000m"
+    EOF
+    else
+    cat >> deployment.yaml << EOF
+              resources:
+                limits:
+                  memory: "1Gi"
+                  cpu: "400m"
+    EOF
+    fi
+
+    if [[ $(echo "${CI_ENVIRONMENT_SLUG%%-*}") != "st" && "${BUILD_ENV}" != "node" ]]; then
+    cat >> deployment.yaml <<EOF
+              command: ["java"]
+              args:
+                - "-Djava.security.egd=file:/dev/./urandom"
+                - "-Duser.timezone=GMT+08"
+                - "-Xms512m"
+                - "-Xmx512m"
+                - "-server"
+                - "-jar"
+                - "/app.jar"
+                - "--server.port=${port}"
+                - "--spring.profiles.active=$profiles_active"
+                - "--k8s.domainName=$CI_ENVIRONMENT_SLUG.sino-hanlin.tech"
+    EOF
+    elif [[ $(echo "${CI_ENVIRONMENT_SLUG%%-*}") == "st" && "${BUILD_ENV}" != "node" ]]; then
+    cat >> deployment.yaml <<EOF
+              command: ["java"]
+              args:
+                - "-Djava.security.egd=file:/dev/./urandom"
+                - "-Duser.timezone=GMT+08"
+                - "-Xms2g"
+                - "-Xmx2g"
+                - "-server"
+                - "-jar"
+                - "/app.jar"
+                - "--server.port=${port}"
+                - "--spring.profiles.active=$profiles_active"
+                - "--k8s.domainName=$CI_ENVIRONMENT_SLUG.sino-hanlin.tech"
+    EOF
+    fi
+      cat >> deployment.yaml <<EOF
+              livenessProbe:
+                httpGet:
+                  path: /actuator/health
+                  port: 8080
+              ports:
+                - name: http
+                  containerPort: ${port}
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: $CI_ENVIRONMENT_SLUG-service
+      namespace: gitlab-managed-apps
+    spec:
+      selector:
+        name: $CI_ENVIRONMENT_SLUG
+      ports:
+        - name: http
+          port: ${port}
+          targetPort: ${port}
+          protocol: TCP
+    ---
+    apiVersion:  networking.k8s.io/v1beta1
+    kind: Ingress
+    metadata:
+      name: $CI_ENVIRONMENT_SLUG-ingress
+      namespace: gitlab-managed-apps
+      annotations:
+        kubernetes.io/ingress.class: nginx
+    spec:
+      rules:
+        - host: $CI_ENVIRONMENT_SLUG.sino-hanlin.tech
+          http:
+            paths:
+              - path: /
+                backend:
+                  serviceName: $CI_ENVIRONMENT_SLUG-service
+                  servicePort: ${port}
+      tls:
+        - hosts:
+            - $CI_ENVIRONMENT_SLUG.sino-hanlin.tech
+          secretName: hanlin-ssl
+    EOF
+
+    cat >> deployment.sh <<EOF
+    if [ $(kubectl --insecure-skip-tls-verify get deploy ${CI_ENVIRONMENT_SLUG} -n gitlab-managed-apps --no-headers=true -o custom-columns=replicas:.status.replicas || echo 0) -gt 0 ]
+    then
+    	echo 'the deployment is already exists, do image update ...'
+    	kubectl --insecure-skip-tls-verify set image deployment/${CI_ENVIRONMENT_SLUG} ${CI_ENVIRONMENT_SLUG}=${IMAGE_NAME} -n gitlab-managed-apps
+    else
+    	echo 'the deployment has not been deployed, do create with record...'
+    	kubectl --insecure-skip-tls-verify create -f deployment.yaml --record
+    fi
+    EOF
+
+    sh ./deployment.sh
+
+    echo "the environment url is https://${CI_ENVIRONMENT_SLUG}.sino-hanlin.tech"
+
+.k8s-clean-template: &k8s_clean_definition
+  image: lachlanevenson/k8s-kubectl:latest
+  script:
+    - kubectl --insecure-skip-tls-verify delete deployment $CI_ENVIRONMENT_SLUG -n gitlab-managed-apps
+    - kubectl --insecure-skip-tls-verify delete service $CI_ENVIRONMENT_SLUG-service -n gitlab-managed-apps
+    - kubectl --insecure-skip-tls-verify delete ingress $CI_ENVIRONMENT_SLUG-ingress -n gitlab-managed-apps
+
+maven-test-pkg:
+  image: maven:latest
+  stage: test
+  script:
+    # 打包
+    - "mvn $MAVEN_CLI_OPTS package -U"
+  only:
+    variables:
+      - $BUILD_ENV == "maven"
+    changes:
+      - src/**/*.{java,properties,yml,xml}
+      - .gitlab-ci.yml
+      - Dockerfile
+      - pom.xml
+  artifacts:
+    name: "$CI_PROJECT_NAME-$CI_COMMIT_REF_SLUG"
+    paths:
+      - $BUILD_PATH
+    reports:
+      junit: $JUNIT_REPORTS
+  tags:
+    - k8s
+
+gradle-test-pkg:
+  image: openjdk:11
+  stage: test
+  script:
+    - 'chmod +x ./gradlew'
+    - './gradlew test bootJar'
+  only:
+    variables:
+      - $BUILD_ENV == "gradle"
+    changes:
+      - src/**/*.{java,properties,yml,xml}
+      - .gitlab-ci.yml
+      - Dockerfile
+      - build.gradle
+      - gradle.properties
+      - gradle/wrapper/gradle-wrapper.properties
+      - settings.gradle
+  artifacts:
+    name: "$CI_PROJECT_NAME-$CI_COMMIT_REF_SLUG"
+    #    untracked: true
+    paths:
+      - $BUILD_PATH
+      - $JUNIT_REPORTS
+    reports:
+      junit: $JUNIT_REPORTS
+
+# 支持前端编译打包
+node-test-pkg:
+  image: node:8
+  stage: test
+  script:
+    - 'npm install'
+    - 'npm run build:stage'
+  only:
+    variables:
+      - $BUILD_ENV == "node"
+  artifacts:
+    name: "$CI_PROJECT_NAME-$CI_COMMIT_REF_SLUG"
+    paths:
+      - $BUILD_PATH
+
+build-push:
+  stage: image
+  script:
+    # 登录
+    - "docker login -u $REGISTRY_USER -p $REGISTRY_PWD $DOCKER_PRI_REGISTRY"
+    # 编译镜像
+    - "docker image build --build-arg BUILD_PATH=${BUILD_PATH} -t $IMAGE_NAME ."
+    # 推送镜像到仓库
+    - "docker push $IMAGE_NAME"
+
+# 部署特性测试环境
+# 针对非review开头的且非主干分支
+deploy-feature-to-k8s:
+  stage: deploy
+  variables:
+    profiles_active: test
+  environment:
+    name: feature/$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME
+    url: https://$CI_ENVIRONMENT_SLUG.sino-hanlin.tech/
+    on_stop: stop_feature_app
+    kubernetes:
+      namespace: gitlab-managed-apps
+  <<: *k8s_deploy_definition
+  # 取消从上一个任务中下载artifacts,提升执行效率
+  dependencies: []
+  only:
+    - branches
+  except:
+    - /^review-.*$/
+    - /^st-.*$/
+    - master
+
+# 部署压测测试环境
+# 针对st开头的分支
+deploy-stress-testing-to-k8s:
+  stage: deploy
+  variables:
+    profiles_active: st
+  environment:
+    name: st/$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME
+    url: https://$CI_ENVIRONMENT_SLUG.sino-hanlin.tech/
+    on_stop: stop_st_app
+    kubernetes:
+      namespace: gitlab-managed-apps
+  <<: *k8s_deploy_definition
+  # 取消从上一个任务中下载artifacts,提升执行效率
+  dependencies: []
+  only:
+    - /^st-.*$/
+
+# 部署预览环境
+# 仅对review开头的分支
+deploy-review-to-k8s:
+  stage: deploy
+  variables:
+    profiles_active: test
+  environment:
+    name: review/$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME
+    url: https://$CI_ENVIRONMENT_SLUG.sino-hanlin.tech/
+    on_stop: stop_review_app
+    kubernetes:
+      namespace: gitlab-managed-apps
+  <<: *k8s_deploy_definition
+  # 取消从上一个任务中下载artifacts,提升执行效率
+  dependencies: []
+  only:
+    - /^review-.*$/
+
+# 部署社区环境
+# 仅对master分支
+deploy-community-to-k8s:
+  stage: deploy
+  variables:
+    profiles_active: test
+  environment:
+    name: $CI_PROJECT_NAME
+    url: https://$CI_ENVIRONMENT_SLUG.sino-hanlin.tech/
+    on_stop: stop_community_app
+    kubernetes:
+      namespace: gitlab-managed-apps
+  <<: *k8s_deploy_definition
+  # 取消从上一个任务中下载artifacts,提升执行效率
+  dependencies: []
+  only:
+    - master
+
+stop_community_app:
+  stage: deploy
+  variables:
+    GIT_STRATEGY: none
+  <<: *k8s_clean_definition
+  when: manual
+  dependencies: []
+  environment:
+    name: $CI_PROJECT_NAME
+    action: stop
+    kubernetes:
+      namespace: gitlab-managed-apps
+  only:
+    - master
+
+stop_review_app:
+  stage: deploy
+  dependencies: []
+  variables:
+    GIT_STRATEGY: none
+  <<: *k8s_clean_definition
+  when: manual
+  environment:
+    name: review/$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME
+    action: stop
+    kubernetes:
+      namespace: gitlab-managed-apps
+  only:
+    - /^review-.*$/
+
+stop_feature_app:
+  stage: deploy
+  dependencies: []
+  variables:
+    GIT_STRATEGY: none
+  <<: *k8s_clean_definition
+  when: manual
+  environment:
+    name: feature/$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME
+    action: stop
+    kubernetes:
+      namespace: gitlab-managed-apps
+  only:
+    - branches
+  except:
+    - /^review-.*$/
+    - /^st-.*$/
+    - master
+
+stop_st_app:
+  stage: deploy
+  dependencies: []
+  variables:
+    GIT_STRATEGY: none
+  <<: *k8s_clean_definition
+  when: manual
+  environment:
+    name: st/$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME
+    action: stop
+    kubernetes:
+      namespace: gitlab-managed-apps
+  only:
+    - /^st-.*$/
