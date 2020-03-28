@@ -21,6 +21,3 @@ include:
   - project: 'hanlin/open-source/hanlin-gitlab-ci'
     file: '.gitlab-ci-template.yml'
     ref: 'master'
-
-variables:
-  KUBERNETES_CPU_REQUEST: 4
