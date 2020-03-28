@@ -21,8 +21,3 @@ include:
   - project: 'hanlin/open-source/hanlin-gitlab-ci'
     file: '.gitlab-ci-template.yml'
     ref: 'master'
-
-
-variables:
-  GRADLE_USER_HOME: "/root/.m2"
-  GRADLE_CLI_OPTS: "--info"
