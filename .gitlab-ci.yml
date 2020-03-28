@@ -22,5 +22,5 @@ include:
     file: '.gitlab-ci-template.yml'
     ref: 'master'
 
- variables:
-   KUBERNETES_CPU_REQUEST: 4
+variables:
+  KUBERNETES_CPU_REQUEST: 4
