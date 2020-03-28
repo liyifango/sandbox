@@ -20,4 +20,4 @@
 include:
   - project: 'hanlin/open-source/hanlin-gitlab-ci'
     file: '.gitlab-ci-template.yml'
-    ref: 'dind-build-cache'
+    ref: 'without-git-except-test'
