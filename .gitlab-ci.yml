@@ -25,5 +25,4 @@ include:
 
 variables:
   GRADLE_USER_HOME: "/root/.m2"
-  JAVA_OPTS: " -Xms1g -Xmx6g -Dfile.encoding=UTF-8 -Djava.awt.headless=true"
-  GRADLE_CLI_OPTS: "--configure-on-demand --daemon -Dorg.gradle.parallel=true --info"
+  GRADLE_CLI_OPTS: "--info"
