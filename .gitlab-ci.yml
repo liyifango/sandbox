@@ -18,6 +18,7 @@
 ## KUBE_NAMESPACE k8s部署命名空间 统一为gitlab-managed-apps
 
 include:
+  - template: Code-Quality.gitlab-ci.yml
   - project: 'hanlin/open-source/hanlin-gitlab-ci'
     file: '.gitlab-ci-template.yml'
     ref: 'master'
