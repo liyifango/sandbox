@@ -23,6 +23,210 @@ include:
     file: '.gitlab-ci-template.yml'
     ref: 'master'
 
-code_quality:
-  artifacts:
-    paths: [gl-code-quality-report.json]
+#k8s部署脚本模板
+.k8s-deploy-template: &k8s_deploy_definition
+  image: lachlanevenson/k8s-kubectl:latest
+  script: |
+    if [[ "${BUILD_ENV}" != "node" && "${BUILD_ENV}" != "package" ]]; then export port=8080; else export port=80; fi
+
+    cat >> deployment.yaml <<EOF
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: $CI_ENVIRONMENT_SLUG
+      annotations:
+        app.gitlab.com/env: $CI_ENVIRONMENT_SLUG
+        app.gitlab.com/app: $CI_PROJECT_PATH_SLUG
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          name: $CI_ENVIRONMENT_SLUG
+      template:
+        metadata:
+          labels:
+            name: $CI_ENVIRONMENT_SLUG
+          annotations:
+            app.gitlab.com/env: $CI_ENVIRONMENT_SLUG
+            app.gitlab.com/app: $CI_PROJECT_PATH_SLUG
+    EOF
+
+    if [[ "${BUILD_ENV}" != "node" && "${BUILD_ENV}" != "package" ]]; then
+    cat >> deployment.yaml <<EOF
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "${port}"
+            prometheus.io/path: "/actuator/prometheus"
+    EOF
+    fi
+
+    if [[ $(echo "${CI_ENVIRONMENT_SLUG%%-*}") == "st" ]]; then
+    cat >> deployment.yaml << EOF
+        spec:
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: hanlin.arch/enviroment
+                    operator: Exists
+                  - key: hanlin.arch/enviroment-scope.st
+                    operator: Exists
+    EOF
+    else
+    cat >> deployment.yaml << EOF
+        spec:
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: hanlin.arch/enviroment
+                    operator: Exists
+                  - key: hanlin.arch/enviroment-scope.test
+                    operator: Exists
+                - matchExpressions:
+                  - key: hanlin.arch/enviroment
+                    operator: Exists
+                  - key: hanlin.arch/enviroment-scope.review
+                    operator: Exists
+    EOF
+    fi
+
+    cat >> deployment.yaml <<EOF
+          volumes:
+            - name: time-config
+              hostPath:
+                path: /etc/localtime
+            - name: tz-config
+              hostPath:
+                path: /etc/timezone
+          containers:
+            - name: $CI_ENVIRONMENT_SLUG
+              image: $IMAGE_NAME:$CI_COMMIT_SHORT_SHA
+              volumeMounts:
+                - mountPath: /etc/localtime
+                  name: time-config
+                  readOnly: true
+                - mountPath: /etc/timezone
+                  name: tz-config
+                  readOnly: true
+    EOF
+
+    if [[ $(echo "${CI_ENVIRONMENT_SLUG%%-*}") == "st" ]]; then
+    cat >> deployment.yaml << EOF
+              resources:
+                limits:
+                  memory: "4Gi"
+                  cpu: "2000m"
+                requests:
+                  memory: "1Gi"
+                  cpu: "500m"
+    EOF
+    else
+    cat >> deployment.yaml << EOF
+              resources:
+                limits:
+                  memory: "2Gi"
+                  cpu: "1000m"
+                requests:
+                  memory: "512Mi"
+                  cpu: "50m"
+    EOF
+    fi
+
+    if [[ $(echo "${CI_ENVIRONMENT_SLUG%%-*}") != "st" && "${BUILD_ENV}" != "node" && "${BUILD_ENV}" != "package" ]]; then
+    cat >> deployment.yaml <<EOF
+              args:
+                - "-Djava.security.egd=file:/dev/./urandom"
+                - "-Duser.timezone=GMT+08"
+                - "-Xms256m"
+                - "-Xmx512m"
+                - "-server"
+                - "--server.port=${port}"
+                - "--spring.profiles.active=$profiles_active"
+                - "--k8s.domainName=$CI_ENVIRONMENT_SLUG.sino-hanlin.tech"
+    EOF
+    elif [[ $(echo "${CI_ENVIRONMENT_SLUG%%-*}") == "st" && "${BUILD_ENV}" != "node" && "BUILD_ENV" != "package"]]; then
+    cat >> deployment.yaml <<EOF
+              args:
+                - "-Djava.security.egd=file:/dev/./urandom"
+                - "-Duser.timezone=GMT+08"
+                - "-Xms2g"
+                - "-Xmx2g"
+                - "-server"
+                - "--server.port=${port}"
+                - "--spring.profiles.active=$profiles_active"
+                - "--k8s.domainName=$CI_ENVIRONMENT_SLUG.sino-hanlin.tech"
+    EOF
+    fi
+      cat >> deployment.yaml <<EOF
+              ports:
+                - name: http
+                  containerPort: ${port}
+                - name: debug
+                  containerPort: 9999
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: $CI_ENVIRONMENT_SLUG-service
+    spec:
+      selector:
+        name: $CI_ENVIRONMENT_SLUG
+      ports:
+        - name: http
+          port: ${port}
+          targetPort: ${port}
+          protocol: TCP
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: $CI_ENVIRONMENT_SLUG-debug-service
+    spec:
+      type: NodePort
+      selector:
+        name: $CI_ENVIRONMENT_SLUG
+      ports:
+        - name: http
+          port: 9999
+          targetPort: 30100
+          protocol: TCP
+    ---
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    metadata:
+      name: $CI_ENVIRONMENT_SLUG-ingress
+      annotations:
+        kubernetes.io/ingress.class: nginx
+        cert-manager.io/cluster-issuer: "letsencrypt-staging"
+    spec:
+      rules:
+        - host: $CI_ENVIRONMENT_SLUG.sino-hanlin.tech
+          http:
+            paths:
+              - path: /
+                backend:
+                  serviceName: $CI_ENVIRONMENT_SLUG-service
+                  servicePort: ${port}
+      tls:
+        - hosts:
+            - $CI_ENVIRONMENT_SLUG.sino-hanlin.tech
+          secretName: hanlin-tls
+    EOF
+
+    cat >> deployment.sh <<EOF
+    if [ $(kubectl --insecure-skip-tls-verify get deploy ${CI_ENVIRONMENT_SLUG} --no-headers=true -o custom-columns=replicas:.status.replicas || echo 0) -gt 0 ]
+    then
+    	echo 'the deployment is already exists, do image update ...'
+        kubectl --insecure-skip-tls-verify set image deployment/${CI_ENVIRONMENT_SLUG} ${CI_ENVIRONMENT_SLUG}=${IMAGE_NAME}:${CI_COMMIT_SHORT_SHA}
+    else
+    	echo 'the deployment has not been deployed, do create with record...'
+    	kubectl --insecure-skip-tls-verify apply -f deployment.yaml --record
+    fi
+    EOF
+
+    sh ./deployment.sh
+
+    echo "the environment url is https://${CI_ENVIRONMENT_SLUG}.sino-hanlin.tech"
+

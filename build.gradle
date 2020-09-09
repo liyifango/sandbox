@@ -18,6 +18,9 @@ ext {
 	set('springCloudAlibabaVersion', "2.2.1.RELEASE")
 }
 
+bootRun {
+    jvmArgs "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=9999"
+}
 
 repositories {
     mavenLocal()
