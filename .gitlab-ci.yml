@@ -158,7 +158,7 @@ include:
                 - "--k8s.domainName=$CI_ENVIRONMENT_SLUG.sino-hanlin.tech"
     EOF
     fi
-      cat >> deployment.yaml <<EOF
+    cat >> deployment.yaml <<EOF
               ports:
                 - name: http
                   containerPort: ${port}
@@ -187,7 +187,7 @@ include:
       selector:
         name: $CI_ENVIRONMENT_SLUG
       ports:
-        - name: http
+        - name: debug
           port: 9999
           targetPort: 30100
           protocol: TCP
