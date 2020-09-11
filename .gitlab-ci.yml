@@ -205,9 +205,12 @@ include:
           http:
             paths:
               - path: /
+                pathType: Perfix
                 backend:
-                  serviceName: $CI_ENVIRONMENT_SLUG-service
-                  servicePort: ${port}
+                  service:
+                    name: $CI_ENVIRONMENT_SLUG-service
+                    port: 
+                      number: ${port}
       tls:
         - hosts:
             - $CI_ENVIRONMENT_SLUG.sino-hanlin.tech
