@@ -20,4 +20,4 @@
 include:
   - project: 'hanlin/open-source/hanlin-gitlab-ci'
     file: '.gitlab-ci-template.yml'
-    ref: 'include-local'
+    ref: 'fix-dind-tls'
