@@ -26,7 +26,7 @@ variables:
   DOCKER_TLS_CERTDIR: ""
 
 services:
-  - name: docker:dind
+  - name: docker:19-dind
     command: ["--insecure-registry","maven.sino-hanlin.tech:30005","--registry-mirror","https://docker.mirrors.ustc.edu.cn"]
     entrypoint: ["dockerd"]
 
