@@ -17,7 +17,23 @@
 ## REGISTRY_PWD docker私有仓库登录密码
 ## KUBE_NAMESPACE k8s部署命名空间 统一为gitlab-managed-apps
 
-include:
-  - project: 'hanlin/open-source/hanlin-gitlab-ci'
-    file: '.gitlab-ci-template.yml'
-    ref: 'fix-dind-tls'
+image: docker:stable
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_HOST: tcp://docker:2375
+  # 关闭dind TLS
+  DOCKER_TLS_CERTDIR: ""
+
+services:
+  - name: docker:dind
+    command: ["--insecure-registry","maven.sino-hanlin.tech:30005","--registry-mirror","https://docker.mirrors.ustc.edu.cn"]
+    entrypoint: ["docerd"]
+
+stages:
+  - image
+
+build:
+  stage: image
+  script:
+    - "docker login -u $REGISTRY_USER -p $REGISTRY_PWD $DOCKER_PRI_REGISTRY"
