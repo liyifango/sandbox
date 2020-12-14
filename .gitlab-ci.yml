@@ -21,14 +21,13 @@ image: docker:latest
 
 variables:
   DOCKER_DRIVER: overlay2
-  DOCKER_HOST: tcp://docker:2375
+  DOCKER_HOST: tcp://docker:2376
   # 关闭dind TLS
   DOCKER_TLS_CERTDIR: ""
 
 services:
   - name: docker:dind
     command: ["--insecure-registry", "maven.sino-hanlin.tech:30005", "--registry-mirror", "https://docker.mirrors.ustc.edu.cn"]
-    entrypoint: ["dockerd"]
 
 stages:
   - image
@@ -36,4 +35,4 @@ stages:
 build:
   stage: image
   script:
-    - "docker login -u $REGISTRY_USER -p $REGISTRY_PWD $DOCKER_PRI_REGISTRY"
+    - docker info
