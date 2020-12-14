@@ -28,7 +28,7 @@ variables:
 services:
   - name: docker:dind
     command: ["--insecure-registry","maven.sino-hanlin.tech:30005","--registry-mirror","https://docker.mirrors.ustc.edu.cn"]
-    entrypoint: ["docerd"]
+    entrypoint: ["dockerd"]
 
 stages:
   - image
