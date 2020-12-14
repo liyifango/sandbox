@@ -17,7 +17,7 @@
 ## REGISTRY_PWD docker私有仓库登录密码
 ## KUBE_NAMESPACE k8s部署命名空间 统一为gitlab-managed-apps
 
-image: docker:19
+image: docker:latest
 
 variables:
   DOCKER_DRIVER: overlay2
@@ -26,7 +26,8 @@ variables:
   DOCKER_TLS_CERTDIR: ""
 
 services:
-  - docker:19-dind
+  - name: docker:dind
+    command: ["--insecure-registries", "maven.sino-hanlin.tech:30005"]
 
 stages:
   - image
@@ -34,4 +35,4 @@ stages:
 build:
   stage: image
   script:
-    - docker info
+    - docker login -u gitlab -p gitlab@hanlin maven.sino-hanlin.tech:30005
