@@ -17,17 +17,15 @@
 ## REGISTRY_PWD docker私有仓库登录密码
 ## KUBE_NAMESPACE k8s部署命名空间 统一为gitlab-managed-apps
 
-image: docker:latest
+image: docker:19.03.0
 
 variables:
   DOCKER_DRIVER: overlay2
-  DOCKER_HOST: tcp://docker:2376
   # 关闭dind TLS
   DOCKER_TLS_CERTDIR: ""
 
 services:
-  - name: docker:dind
-    command: ["--insecure-registry", "maven.sino-hanlin.tech:30005", "--registry-mirror", "https://docker.mirrors.ustc.edu.cn"]
+  - docker:19.03.0-dind
 
 stages:
   - image
