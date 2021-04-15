@@ -20,7 +20,7 @@
 include:
   - project: 'hanlin/open-source/hanlin-gitlab-ci'
     file: '.gitlab-ci-template.yml'
-    ref: $CI_DEFAULT_BRANCH
+    ref: upload
 
 variables:
   BUILD_ENV: gradle
