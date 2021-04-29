@@ -21,3 +21,11 @@ include:
   - project: 'hanlin/open-source/hanlin-gitlab-ci'
     file: '.gitlab-ci-template.yml'
     ref: 'master'
+
+variables:
+  BUILD_ENV: gradle
+  BUILD_PATH: build/libs/*.jar
+  JUNIT_REPORTS: build/test-results/test/TEST-*.xml
+
+gradle-test-pkg:
+  image: openjdk:11
