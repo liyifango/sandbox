@@ -34,11 +34,10 @@ gradle-test-pkg:
 deploy-community-to-k8s:
   variables:
     profiles_active: release
-    USE_DEFAULT_HANLIN_ENV: 'false'
   environment:
-    name: sandbox-hyundai-release
+    name: $CI_PROJECT_NAME
 
 stop_community_app:
   environment:
-    name: sandbox-hyundai-release
+    name: $CI_PROJECT_NAME
 
