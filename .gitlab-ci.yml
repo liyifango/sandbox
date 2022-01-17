@@ -20,7 +20,7 @@
 include:
   - project: 'hanlin/open-source/hanlin-gitlab-ci'
     file: '.gitlab-ci-template.yml'
-    ref: 'skywalking'
+    ref: 'multi-clusters-management'
 
 variables:
   BUILD_ENV: gradle
