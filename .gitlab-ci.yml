@@ -29,3 +29,15 @@ variables:
 
 gradle-test-pkg:
   image: openjdk:11
+
+# master环境部署到百度云k8s
+deploy-community-to-k8s:
+  variables:
+    profiles_active: release
+  environment:
+    name: sandbox-hyundai-release
+
+stop_community_app:
+  environment:
+    name: sandbox-hyundai-release
+
