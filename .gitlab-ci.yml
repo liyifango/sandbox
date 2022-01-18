@@ -34,6 +34,8 @@ gradle-test-pkg:
 deploy-community-to-k8s:
   variables:
     profiles_active: release
+    REPLICAS: 2
+    USE_DEFAULT_HANLIN_ENV: 'false'
   environment:
     name: $CI_PROJECT_NAME
 
