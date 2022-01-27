@@ -37,9 +37,9 @@ deploy-community-to-k8s:
     REPLICAS: 2
     USE_DEFAULT_HANLIN_ENV: 'false'
   environment:
-    name: $CI_PROJECT_NAME-hyundai-release
+    name: $CI_PROJECT_NAME
 
 stop_community_app:
   environment:
-    name: $CI_PROJECT_NAME-hyundai-release
+    name: $CI_PROJECT_NAME
 
