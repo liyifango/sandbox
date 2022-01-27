@@ -20,7 +20,7 @@
 include:
   - project: 'hanlin/open-source/hanlin-gitlab-ci'
     file: '.gitlab-ci-template.yml'
-    ref: 'multi-clusters-management'
+    ref: 'helm-ci'
 
 variables:
   BUILD_ENV: gradle
