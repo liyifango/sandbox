@@ -1,18 +1,20 @@
 package com.sinosoft.hanlin.sandbox.common;
 
-import com.baomidou.mybatisplus.extension.plugins.PaginationInterceptor;
-import com.baomidou.mybatisplus.extension.plugins.pagination.optimize.JsqlParserCountOptimize;
+import com.baomidou.mybatisplus.annotation.DbType;
+import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
+import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@MapperScan("com.sinosoft.hanlin.sandbox.*.dao")
+@MapperScan("com.sinosoft.hanlin.sandbox")
 public class MybatisPlusConfiguration {
 
 	@Bean
-	public PaginationInterceptor paginationInterceptor() {
-		return new PaginationInterceptor().setCountSqlParser(new JsqlParserCountOptimize(true));
+	public MybatisPlusInterceptor mybatisPlusInterceptor() {
+		MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
+		return interceptor;
 	}
 
 }
