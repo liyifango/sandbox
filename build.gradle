@@ -20,7 +20,7 @@ repositories {
 }
 
 ext {
-  set('springCloudAlibabaVersion', "2021.1")
+  set('springCloudAlibabaVersion', "2021.0.1.0")
 }
 
 
@@ -28,7 +28,6 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'cn.hutool:hutool-all:5.7.21'
-	implementation 'com.github.ulisesbocchio:jasypt-spring-boot-starter:3.0.4'
 	implementation 'io.springfox:springfox-boot-starter:3.0.0'
     implementation 'com.alibaba:fastjson:1.2.79'
     implementation 'com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery'
