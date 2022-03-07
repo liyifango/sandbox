@@ -1,3 +1,2 @@
-
-
+export spec_url=$(kubectl -n sandbox-42-ft-sandbox-test-f-m96bke get ingress sandbox-test-ft -o=jsonpath='{.spec.rules[0].host}')
 The environment url is : ${spec_url}
