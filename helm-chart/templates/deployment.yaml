@@ -72,12 +72,12 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}
       volumes:
-      - name: time-config
-        hostPath:
-          path: /etc/localtime
-      - name: tz-config
-        hostPath:
-          path: /etc/timezone
+        - name: time-config
+          hostPath:
+            path: /etc/localtime
+        - name: tz-config
+          hostPath:
+            path: /etc/timezone
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
