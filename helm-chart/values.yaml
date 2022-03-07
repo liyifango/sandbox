@@ -6,7 +6,7 @@
 replicaCount: 1
 
 image:
-  repository: maven.sino-hanlin.tech:30005/sandbox
+  repository: maven.sino-hanlin.tech:30005/demo
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
@@ -90,6 +90,12 @@ nodeSelector: {}
 
 tolerations: []
 
-affinity: {}
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: hanlin.arch/enviroment
+          operator: Exists
 
 

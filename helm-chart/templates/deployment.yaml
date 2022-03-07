@@ -2,9 +2,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "sandbox.fullname" . }}
+  name: {{ include "demo.fullname" . }}
   labels:
-    {{- include "sandbox.labels" . | nindent 4 }}
+    {{- include "demo.labels" . | nindent 4 }}
   {{- with .Values.deploymentAnnotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -15,7 +15,7 @@ spec:
   {{- end }}
   selector:
     matchLabels:
-      {{- include "sandbox.selectorLabels" . | nindent 6 }}
+      {{- include "demo.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -23,13 +23,13 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "sandbox.selectorLabels" . | nindent 8 }}
+        {{- include "demo.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "sandbox.serviceAccountName" . }}
+      serviceAccountName: {{ include "demo.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -53,6 +53,13 @@ spec:
             - name: http
               containerPort: 8080
               protocol: TCP
+          volumeMounts:
+            - mountPath: /etc/localtime
+              name: time-config
+              readOnly: true
+            - mountPath: /etc/timezone
+              name: tz-config
+              readOnly: true
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
@@ -64,6 +71,13 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}
+      volumes:
+      - name: time-config
+        hostPath:
+          path: /etc/localtime
+      - name: tz-config
+        hostPath:
+          path: /etc/timezone
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -75,4 +89,3 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-
