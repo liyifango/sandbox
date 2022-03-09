@@ -19,7 +19,20 @@ podArgs:
   - "-Duser.timezone=GMT+08"
   - "-Djava.awt.headless=true"
   - "-Dfile.encoding=UTF-8"
+  - "-XX:+HeapDumpOnOutOfMemoryError"
+  - "-XX:HeapDumpPath=/application/logs/hs_err_pid%p.hprof"
+  - "-XX:+PrintGCDetails"
+  - "-XX:+PrintGCDateStamps"
+  - "-XX:+PrintTenuringDistribution"
+  - "-XX:+PrintHeapAtGC"
+  - "-XX:+PrintGCApplicationStoppedTime"
+  - "-XX:+PrintReferenceGC"
+  - "-XX:+UseGCLogFileRotation"
+  - "-XX:NumberOfGCLogFiles=10"
+  - "-XX:GCLogFileSize=100M"
+  - "-Xloggc:/application/logs/gc-%t.log"
   - "-server"
+
 podRuntimeArgs: []
 
 serviceAccount:
@@ -35,7 +48,11 @@ deploymentAnnotations: {}
   # app.gitlab.com/env:
   # app.gitlab.com/app:
 
-podAnnotations: {}
+# 如果存在prometheus依赖，则开启对应监听端点
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: "/actuator/prometheus"
 
 podSecurityContext: {}
   # fsGroup: 2000
@@ -67,14 +84,14 @@ ingress:
   #    hosts:
   #      - chart-example.local
 
-resources:
+resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little
   # resources, such as Minikube. If you do want to specify resources, uncomment the following
   # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
-  limits:
-    cpu: 400m
-    memory: 512Mi
+  # limits:
+  #  cpu: 400m
+  #  memory: 512Mi
   # requests:
   #   cpu: 100m
   #   memory: 128Mi
