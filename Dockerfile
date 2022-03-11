@@ -12,6 +12,9 @@ FROM openjdk:11-slim
 WORKDIR application
 # 生成一个用于存储日志的目录
 RUN mkdir logs
+# 定义用户runner并使用runner启动容器，避免直接使用root身份启动造成安全隐患
+RUN addgroup -S app && adduser -S runner -G app
+USER runner
 # 从上面构建的builder 中复制层  注意保证层的顺序
 COPY --from=builder application/dependencies/ ./
 COPY --from=builder application/spring-boot-loader/ ./
