@@ -21,6 +21,7 @@ include:
   - project: 'hanlin/open-source/hanlin-gitlab-ci'
     file: '.gitlab-ci-template.yml'
     ref: 'helm-ci'
+  - template: Security/SAST.gitlab-ci.yml
 
 variables:
   BUILD_ENV: gradle
