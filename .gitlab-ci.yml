@@ -20,8 +20,7 @@
 include:
   - project: 'hanlin/open-source/hanlin-gitlab-ci'
     file: '.gitlab-ci-template.yml'
-    ref: 'helm-ci'
-  - template: Security/SAST.gitlab-ci.yml
+    ref: 'skywalking'
 
 variables:
   BUILD_ENV: gradle
