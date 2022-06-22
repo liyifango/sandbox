@@ -31,4 +31,6 @@ variables:
 
 gradle-test-pkg:
   image: openjdk:11
+  artifacts:
+    expire_in: 5 mins
 
