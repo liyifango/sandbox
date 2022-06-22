@@ -27,7 +27,7 @@ variables:
   BUILD_PATH: build/libs/*.jar
   JUNIT_REPORTS: build/test-results/test/TEST-*.xml
   SAST_JAVA_VERSION: 11
-  CANARY_ENABLED: true
+  CANARY_ENABLED: 'true'
 
 gradle-test-pkg:
   image: openjdk:11
