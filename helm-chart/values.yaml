@@ -68,12 +68,12 @@ prometheus:
 ## livenessProbe & readinessProbe
 livenessProbe:
   probeType: "httpGet"
-  path: /actuator/liveness
+  path: /actuator/health/liveness
   initialDelaySeconds: 10
   timeoutSeconds: 30
 readinessProbe:
   probeType: "httpGet"
-  path: /actuator/readiness
+  path: /actuator/health/readiness
   initialDelaySeconds: 10
   timeoutSeconds: 30
 
