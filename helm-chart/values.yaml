@@ -64,6 +64,7 @@ serviceAccount:
 # 如果存在prometheus依赖，则开启对应监听端点
 prometheus:
   metrics: "true"
+  path: /actuator/prometheus
 
 ## livenessProbe & readinessProbe
 livenessProbe:

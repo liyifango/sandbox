@@ -10,7 +10,10 @@ metadata:
   {{- end }}
   {{- if .Values.prometheus.metrics }}
     prometheus.io/scrape: "true"
-    prometheus.io/port: "{{ .Values.service.internalPort }}"
+    prometheus.io/port: {{ .Values.service.internalPort | quote }}
+    {{- if .Values.prometheus.path }}
+    prometheus.io/path: {{ .Values.prometheus.path }}
+    {{- end }}
   {{- end }}
   labels:
     {{- include "sandbox.labels" . | nindent 4 }}

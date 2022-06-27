@@ -77,7 +77,7 @@ spec:
             path: /etc/timezone
       {{- if .Values.persistence.enabled }}
       {{- $context := . }}
-        {{- range $volume := .Values.persistence.volumes }}
+      {{- range $volume := .Values.persistence.volumes }}
         -name: {{ $volume.name | quote }}
          persistentVolumeClaim:
            {{ $args := dict "context" $context "name" $volume.name }}
