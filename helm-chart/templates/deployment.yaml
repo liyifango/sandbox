@@ -68,8 +68,6 @@ spec:
       topologySpreadConstraints:
         {{- toYaml .Values.topologySpreadConstraints | indent 8 }}
       {{- end }}
-      {{- if .Values.persistence.enabled }}
-      {{- $context := . }}
       volumes:
         - name: time-config
           hostPath:
@@ -77,6 +75,8 @@ spec:
         - name: tz-config
           hostPath:
             path: /etc/timezone
+      {{- if .Values.persistence.enabled }}
+      {{- $context := . }}
         {{- range $volume := .Values.persistence.volumes }}
         -name: {{ $volume.name | quote }}
          persistentVolumeClaim:
