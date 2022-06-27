@@ -21,10 +21,6 @@ metadata:
     {{- include "sandbox.labels" . | nindent 4 }}
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "1024m"
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      proxy_set_header X-Forwarded-For "$remote_addr";
-      proxy_set_header X-Real-IP "$remote_addr";
-      log-format ingLogFormat "$remote_addr||$time_iso8601||$request_method||$scheme||$http_host||$request_uri||$request_length||$service||$resource_namespace||$server_addr||$server_port||$server_protocol||$body_bytes_sent||$http_x_readtime||$http_referer||$http_user_agent||$http_x_real_ip||$http_x_forwarded_for||$status||$request_time||$upstream_addr||$upstream_response_time||$upstream_status||$host||$hostname||$slbid||$vip_addr||$slb_vport||$ssl_cipher||$ssl_protocol||$ssl_session_reused||$ssl_handshake_time||$connection||$connection_requests||$response_fbt_time||$read_request_time||$write_response_time||$tcpinfo_rtt||$ssl_session_reused_type||$ssl_keyless_response_time||$upstream_scheme||$remote_port||$upstream_connect_time||$upstream_header_time||$slb_rule||$slb_pool||";
     {{- if .Values.ingress.certmanager.enabled }}
     kubernetes.io/tls-acme: "true"
     {{- if eq .Values.ingress.certmanager.type "cluster-issuer" }}
@@ -50,13 +46,12 @@ metadata:
     nginx.ingress.kubernetes.io/canary-by-weight: {{ .Values.ingress.canary.weight | quote }}
     {{- end }}
     {{- end }}
+    {{- if .Values.prometheus.metrics }}
     nginx.ingress.kubernetes.io/server-snippet: |-
-      access_log /var/log/nginx/access.log ingLogFormat
-      {{- if .Values.prometheus.metrics }}
       location /metrics {
           deny all;
       }
-      {{- end }}
+    {{- end }}
 spec:
   {{- if and .Values.ingress.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
   ingressClassName: {{ .Values.ingress.className | quote}}
