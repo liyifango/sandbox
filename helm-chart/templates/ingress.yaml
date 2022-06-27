@@ -51,7 +51,7 @@ metadata:
     {{- end }}
     {{- end }}
     nginx.ingress.kubernetes.io/server-snippet: |-
-      access_log logs/{{ .Release.name }}.log ingLogFormat
+      access_log /var/log/nginx/access.log ingLogFormat
       {{- if .Values.prometheus.metrics }}
       location /metrics {
           deny all;
