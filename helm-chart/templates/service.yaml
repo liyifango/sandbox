@@ -1,17 +1,45 @@
 
+{{- if .Values.service.enabled -}}
 apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "sandbox.fullname" . }}
+  annotations:
+  {{- if .Values.service.annotations }}
+  {{ toYaml .Values.service.annotations | indent 4 }}
+  {{- end }}
+  {{- if .Values.prometheus.metrics }}
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "{{ .Values.service.internalPort }}"
+  {{- end }}
   labels:
     {{- include "sandbox.labels" . | nindent 4 }}
+    {{- if .Values.application.track }}
+    track: {{ .Values.application.track | quote }}
+    {{- end }}
 spec:
   type: {{ .Values.service.type }}
+  {{- if and (eq .Values.application.track "canary") ( .Values.ingress.canary) ( .Values.ingress.canary.weight ) }}
+  {{/* 当金丝雀策略存在按权重分流时，调整会话亲和策略为ClientIP以保证特定客户端的连接传递到同一个Pod*/}}
+  sessionAffinity: ClientIP
+  {{- end }}
   ports:
-    - port: {{ .Values.service.port }}
-      targetPort: http
+    - port: {{ .Values.service.externalPort }}
+      targetPort: {{ .Values.service.internalPort }}
       protocol: TCP
-      name: http
+      name: {{ .Values.service.name }}
+      {{- if eq .Values.service.type "NodePort" }}
+      nodePort: {{ .Values.service.nodePort }}
+      {{- end }}
+    {{- if .Values.service.extraPorts }}
+    {{ toYaml .Values.service.extraPorts | indent 2 }}
+    {{- end }}
   selector:
     {{- include "sandbox.selectorLabels" . | nindent 4 }}
-
+    {{- if .Values.application.track }}
+    track: {{ .Values.application.track | quote }}
+    {{- end }}
+    {{- if .Values.application.tier }}
+    tier: {{ .Values.application.tier | quote }}
+    {{- end }}
+    {{- end -}}

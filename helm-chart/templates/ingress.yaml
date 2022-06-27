@@ -1,30 +1,64 @@
 {{- if .Values.ingress.enabled -}}
+
+{{- if .Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress" }}
+apiVersion: networking.k8s.io/v1
+{{- else if .Capabilities.APIVersions.Has "networking.k8s.io/v1beta1/Ingress" }}
+apiVersion: networking.k8s.io/v1beta1
+{{- else }}
+apiVersion: extensions/v1beta1
+{{- end }}
+kind: Ingress
 {{- $fullName := include "sandbox.fullname" . -}}
-{{- $svcPort := .Values.service.port -}}
+{{- $svcPort := .Values.service.externalPort -}}
 {{- if and .Values.ingress.className (not (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion)) }}
   {{- if not (hasKey .Values.ingress.annotations "kubernetes.io/ingress.class") }}
   {{- $_ := set .Values.ingress.annotations "kubernetes.io/ingress.class" .Values.ingress.className}}
   {{- end }}
 {{- end }}
-{{- if semverCompare ">=1.19-0" .Capabilities.KubeVersion.GitVersion -}}
-apiVersion: networking.k8s.io/v1
-{{- else if semverCompare ">=1.14-0" .Capabilities.KubeVersion.GitVersion -}}
-apiVersion: networking.k8s.io/v1beta1
-{{- else -}}
-apiVersion: extensions/v1beta1
-{{- end }}
-kind: Ingress
 metadata:
   name: {{ $fullName }}
   labels:
     {{- include "sandbox.labels" . | nindent 4 }}
-  {{- with .Values.ingress.annotations }}
   annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+    nginx.ingress.kubernetes.io/proxy-body-size: "1024m"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header X-Forwarded-For "$remote_addr";
+      proxy_set_header X-Real-IP "$remote_addr";
+      log-format "$remote_addr||$time_iso8601||$request_method||$scheme||$http_host||$request_uri||$request_length||$service||$resource_namespace||$server_addr||$server_port||$server_protocol||$body_bytes_sent||$http_x_readtime||$http_referer||$http_user_agent||$http_x_real_ip||$http_x_forwarded_for||$status||$request_time||$upstream_addr||$upstream_response_time||$upstream_status||$host||$hostname||$slbid||$vip_addr||$slb_vport||$ssl_cipher||$ssl_protocol||$ssl_session_reused||$ssl_handshake_time||$connection||$connection_requests||$response_fbt_time||$read_request_time||$write_response_time||$tcpinfo_rtt||$ssl_session_reused_type||$ssl_keyless_response_time||$upstream_scheme||$remote_port||$upstream_connect_time||$upstream_header_time||$slb_rule||$slb_pool||";
+    {{- if .Values.ingress.certmanager.enabled }}
+    kubernetes.io/tls-acme: "true"
+    {{- if eq .Values.ingress.certmanager.type "cluster-issuer" }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.certmanager.issuer | quote }}
+    {{- else if eq .Values.ingress.certmanager.type "issuer" }}
+    cert-manager.io/issuer: {{ .Values.ingress.certmanager.issuer | quote }}
+    {{- end }}
+    {{- end }}
+    {{- if eq .Values.application.track "canary" }}
+    nginx.ingress.kubernetes.io/canary: "true"
+    {{- if .Values.ingress.canary.cookie }}
+    nginx.ingress.kubernetes.io/canary-by-cookie: {{ .Values.ingress.canary.cookie | quote }}
+    {{- end }}
+    {{- if .Values.ingress.canary.header }}
+    nginx.ingress.kubernetes.io/canary-by-header: {{ .Values.ingress.canary.header | quote }}
+    {{- end }}
+    {{- if .Values.ingress.canary.header.value }}
+    nginx.ingress.kubernetes.io/canary-by-header-value: {{ .Values.ingress.canary.header.value | quote }}
+    {{- else if .Values.ingress.canary.header.pattern }}
+    nginx.ingress.kubernetes.io/canary-by-header-pattern: {{ .Values.ingress.canary.header.pattern | quote }}
+    {{- end }}
+    {{- if .Values.ingress.canary.weight }}
+    nginx.ingress.kubernetes.io/canary-by-weight: {{ .Values.ingress.canary.weight | quote }}
+    {{- end }}
+    {{- end }}
+    {{- if .Values.prometheus.metrics }}
+    nginx.ingress.kubernetes.io/server-snippet: |-
+      location /metrics {
+          deny all;
+      }
+    {{- end }}
 spec:
   {{- if and .Values.ingress.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
-  ingressClassName: {{ .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className | quote}}
   {{- end }}
   {{- if .Values.ingress.tls }}
   tls:

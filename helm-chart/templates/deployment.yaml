@@ -3,73 +3,73 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "sandbox.fullname" . }}
-  labels:
-    {{- include "sandbox.labels" . | nindent 4 }}
-  {{- with .Values.deploymentAnnotations }}
   annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- if .Values.gitlab.app }}
+    app.gitlab.com/app: {{ .Values.gitlab.app | quote }}
+    {{- end }}
+    {{- if .Values.gitlab.env }}
+    app.gitlab.com/env: {{ .Values.gitlab.env | quote }}
+    {{- end }}
+  labels:
+    {{- if .Values.application.track }}
+    track: {{ .Values.application.track | quote }}
+    {{- end }}
+    {{- if .Values.application.tier }}
+    tier: {{ .Values.application.tier | quote }}
+    {{- end }}
+    {{- include "sandbox.labels" . | nindent 4 }}
 spec:
+  selector:
+    matchLabels:
+      {{- if .Values.application.track }}
+      track: {{ .Values.application.track | quote }}
+      {{- end }}
+      {{- if .Values.application.tier }}
+      tier: {{ .Values.application.tier | quote }}
+      {{- end }}
+      {{- include "sandbox.selectorLabels" . | nindent 6 }}
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
-  selector:
-    matchLabels:
-      {{- include "sandbox.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
       annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- if .Values.gitlab.app }}
+        app.gitlab.com/app: {{ .Values.gitlab.app | quote }}
+        {{- end }}
+        {{- if .Values.gitlab.env }}
+        app.gitlab.com/env: {{ .Values.gitlab.env | quote }}
+        {{- end }}
       labels:
+        {{- if .Values.application.track }}
+        track: {{ .Values.application.track | quote }}
+        {{- end }}
+        {{- if .Values.application.tier }}
+        tier: {{ .Values.application.tier | quote }}
+        {{- end }}
         {{- include "sandbox.selectorLabels" . | nindent 8 }}
     spec:
+      {{- if or (.Values.serviceAccount.name) (.Values.serviceAccountName) }}
+      serviceAccountName: {{ .Values.serviceAccount.name | default .Values.servceAccountName | quote }}
+      {{- end }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml . | indent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "sandbox.serviceAccountName" . }}
+      {{- if .Values.podSecurityContext }}
       securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      containers:
-        - name: {{ .Chart.Name }}
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if .Values.podArgs }}
-          args:
-            {{- range .Values.podArgs }}
-            - {{ . | quote }}
-            {{- end }}
-            {{- if .Values.podRuntimeArgs }}
-            {{- range .Values.podRuntimeArgs }}
-            - {{ . | quote }}
-            {{- end }}
-            {{- end }}
-          {{- end }}
-          ports:
-            - name: http
-              containerPort: 8080
-              protocol: TCP
-          volumeMounts:
-            - mountPath: /etc/localtime
-              name: time-config
-              readOnly: true
-            - mountPath: /etc/timezone
-              name: tz-config
-              readOnly: true
-          livenessProbe:
-            httpGet:
-              path: /actuator/health/liveness
-              port: http
-          readinessProbe:
-            httpGet:
-              path: /actuator/health/readiness
-              port: http
-          resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+        {{- toYaml .Values.podSecurityContext | indent 8 }}
+      {{- end }}
+      {{- if .Values.initContainers }}
+      initContainers:
+        {{- toYaml .Values.initContainers | indent 8 }}
+      {{- end }}
+      {{- if and (semverCompare ">= 1.19.x" .Capabilities.KubeVersion.Version) (.Values.topologySpreadConstraints) }}
+      topologySpreadConstraints:
+        {{- toYaml .Values.topologySpreadConstraints | indent 8 }}
+      {{- end }}
+      {{- if .Values.persistence.enabled }}
+      {{- $context := . }}
       volumes:
         - name: time-config
           hostPath:
@@ -77,6 +77,106 @@ spec:
         - name: tz-config
           hostPath:
             path: /etc/timezone
+        {{- range $volume := .Values.persistence.volumes }}
+        -name: {{ $volume.name | quote }}
+         persistentVolumeClaim:
+           {{ $args := dict "context" $context "name" $volume.name }}
+           claimName: {{ template "pvcName" $args }}
+      {{- end }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.application.command }}
+          command:{{- toYaml .Values.application.command | nindent 12 }}
+          {{- end }}
+          {{- if or (.Values.application.args) (.Values.vm.options) (.Values.program.args) }}
+          args:
+            {{- range .Values.application.args }}
+            - {{ . | quote }}
+            {{- end }}
+            {{- range .Values.vm.options }}
+            - {{ . | quote }}
+            {{- end }}
+            {{- range .Values.program.args }}
+            - {{ . | quote }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.application.secretName }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.application.secretName }}
+          {{- end }}
+          {{- if .Values.securityContext }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: {{ .Values.service.name | quote }}
+              containerPort: {{ .Values.service.internalPort }}
+            {{- if .Values.service.extraPorts }}
+            {{- range $servicePort := .Values.service.extraPorts }}
+            - name: {{ $servicePort.name }}
+              containerPort: {{ $servicePort.targetPort }}
+              {{- if $servicePort.protocol }}
+              protocol: {{ $servicePort.protocol }}
+              {{- end }}
+            {{- end }}
+            {{- end }}
+          volumeMounts:
+            - mountPath: /etc/localtime
+              name: time-config
+              readOnly: true
+            - mountPath: /etc/timezone
+              name: tz-config
+              readOnly: true
+            {{- if .Values.persistence.enabled }}
+            {{- range $volume := .Values.persistence.volumes }}
+            - name: {{ $volume.name | quote }}
+              mountPath: {{ $volume.mount.path | quote }}
+              {{- if $volume.mount.subPath }}
+              subPath: {{ $volume.mount.subPath | quote }}
+              {{- end }}
+            {{- end }}
+            {{- end }}
+          {{- $defaultInternalPort := .Values.service.internalPort -}}
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+          {{- if eq .probeType "httpGet" }}
+            httpGet:
+              path: {{ .path }}
+              port: {{ .port | default $defaultInternalPort }}
+              scheme: {{ .scheme | default "HTTP" }}
+          {{- else if eq .probeType "tcpSocket" }}
+            tcpSocket:
+              port: {{ .port | default $defaultInternalPort }}
+          {{- else if eq .probeType "exec" }}
+            exec:
+              command: {{- toYaml .command | nindent 14 }}
+          {{- end }}
+            initialDelaySeconds: {{ .initialDelaySeconds }}
+            timeoutSeconds: {{ .timeoutSeconds }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+          {{- if eq .probeType "httpGet" }}
+            httpGet:
+              path: {{ .path }}
+              port: {{ .port | default $defaultInternalPort }}
+              scheme: {{ .scheme | default "HTTP" }}
+          {{- else if eq .probeType "tcpSocket" }}
+            tcpSocket:
+              port: {{ .port | default $defaultInternalPort }}
+          {{- else if eq .probeType "exec" }}
+            exec:
+              command: {{- toYaml .command | nindent 14 }}
+          {{- end }}
+            initialDelaySeconds: {{ .initialDelaySeconds }}
+            timeoutSeconds: {{ .timeoutSeconds }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
