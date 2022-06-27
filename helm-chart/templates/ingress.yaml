@@ -40,11 +40,11 @@ metadata:
     {{- end }}
     {{- if .Values.ingress.canary.header }}
     nginx.ingress.kubernetes.io/canary-by-header: {{ .Values.ingress.canary.header | quote }}
-    {{- end }}
     {{- if .Values.ingress.canary.header.value }}
     nginx.ingress.kubernetes.io/canary-by-header-value: {{ .Values.ingress.canary.header.value | quote }}
     {{- else if .Values.ingress.canary.header.pattern }}
     nginx.ingress.kubernetes.io/canary-by-header-pattern: {{ .Values.ingress.canary.header.pattern | quote }}
+    {{- end }}
     {{- end }}
     {{- if .Values.ingress.canary.weight }}
     nginx.ingress.kubernetes.io/canary-by-weight: {{ .Values.ingress.canary.weight | quote }}
