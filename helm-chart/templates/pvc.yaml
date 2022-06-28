@@ -1,0 +1,28 @@
+{{- if .Values.persistence.enabled -}}
+{{- $context := . }}
+{{- range $volume := .Values.persistence.volumes }}
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+{{ $args := dict "context" $context "name" $volume.name }}
+  name: {{ template "pvcName" $args }}
+  labels:
+    {{- if .Values.application.track }}
+    track: {{ .Values.application.track | quote }}
+    {{- end }}
+    {{- if .Values.application.tier }}
+    tier: {{ .Values.application.tier | quote }}
+    {{- end }}
+    {{- include "sandbox.labels" . | nindent 4 }}
+  spec:
+  accessModes:
+  - {{ $volume.claim.accessMode | quote }}
+  resources:
+    requests:
+    storage: {{ $volume.claim.size | quote }}
+    {{- if $volume.claim.storageClass }}
+    storageClassName: {{ $volume.claim.storageClass | quote }}
+    {{- end }}
+{{- end }}
+{{- end -}}

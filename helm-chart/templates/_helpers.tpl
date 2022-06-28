@@ -63,3 +63,10 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
+{{/*
+Generate a name for a Persistent Volume Claim
+*/}}
+{{- define "pvcName" -}}
+{{- printf "%s-%s" (include "sandbox.fullname" .context) .name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
