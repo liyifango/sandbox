@@ -58,12 +58,12 @@ spec:
   {{- end }}
   {{- if .Values.ingress.tls }}
   tls:
-    {{- range .Values.ingress.tls }}
+    {{- range $hosts, $secretName := .Values.ingress.tls }}
     - hosts:
-        {{- range .hosts }}
+        {{- range $hosts }}
         - {{ . | quote }}
         {{- end }}
-      secretName: {{ .secretName }}
+      secretName: {{ $secretName }}
     {{- end }}
   {{- end }}
   rules:

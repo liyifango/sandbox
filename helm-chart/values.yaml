@@ -113,7 +113,7 @@ ingress:
     enabled: false
   #  type: ["cluster-issuer" | "issuer"]
   #  issuer: "letsencrypt-staging"
-  hosts: {}
+  hosts: []
   #   - host: chart-example.local
   #     paths:
   #       - path: /
