@@ -48,14 +48,14 @@ vm:
 
 ## program args
 program:
-  args: {}
+  args: []
 
 ## serivceAccount
 serviceAccount:
   # Specifies whether a service account should be created
   create: true
   # Annotations to add to the service account
-  annotations: {}
+  annotations: []
   # The name of the service account to use.
   # If not set and create is true, a name is generated using the fullname template
   name: ""
@@ -103,7 +103,7 @@ service:
 ## 持久化配置 persistence
 persistence:
   enabled: false
-  volumes: {}
+  volumes: []
 
 ## intgress
 ingress:
@@ -113,7 +113,7 @@ ingress:
     enabled: false
   #  type: ["cluster-issuer" | "issuer"]
   #  issuer: "letsencrypt-staging"
-  hosts: {}
+  hosts: []
   #   - host: chart-example.local
   #     paths:
   #       - path: /
