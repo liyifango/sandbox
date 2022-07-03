@@ -20,7 +20,7 @@
 include:
   - project: 'hanlin/open-source/hanlin-gitlab-ci'
     file: '.gitlab-ci-template.yml'
-    ref: 'helm-revolution'
+    ref: 'master'
 
 variables:
   BUILD_ENV: gradle
