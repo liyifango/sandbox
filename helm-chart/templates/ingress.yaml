@@ -34,8 +34,8 @@ metadata:
     {{- if .Values.ingress.canary.cookie }}
     nginx.ingress.kubernetes.io/canary-by-cookie: {{ .Values.ingress.canary.cookie | quote }}
     {{- end }}
-    {{- if .Values.ingress.canary.header }}
-    nginx.ingress.kubernetes.io/canary-by-header: {{ .Values.ingress.canary.header | quote }}
+    {{- if .Values.ingress.canary.header.name }}
+    nginx.ingress.kubernetes.io/canary-by-header: {{ .Values.ingress.canary.header.name | quote }}
     {{- if .Values.ingress.canary.header.value }}
     nginx.ingress.kubernetes.io/canary-by-header-value: {{ .Values.ingress.canary.header.value | quote }}
     {{- else if .Values.ingress.canary.header.pattern }}
